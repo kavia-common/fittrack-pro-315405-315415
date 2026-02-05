@@ -142,6 +142,22 @@ export POSTGRES_DB="${DB_NAME}"
 export POSTGRES_PORT="${DB_PORT}"
 EOF
 
+# Apply FitTrack schema + seed data (idempotent)
+# NOTE: This runs after DB/user creation so objects are created in the target DB.
+SCHEMA_FILE="$(dirname "$0")/init_schema_seed.sql"
+if [ -f "${SCHEMA_FILE}" ]; then
+    echo "Applying FitTrack schema & seed data from ${SCHEMA_FILE} ..."
+    # Use ON_ERROR_STOP so container startup fails fast if schema is invalid.
+    # Use TCP localhost and explicit port for reliability.
+    PGPASSWORD="${DB_PASSWORD}" sudo -u postgres ${PG_BIN}/psql \
+        -h localhost -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} \
+        --set ON_ERROR_STOP=on \
+        -f "${SCHEMA_FILE}"
+    echo "✓ Schema & seed applied"
+else
+    echo "⚠ Schema file not found at ${SCHEMA_FILE}; skipping schema initialization"
+fi
+
 echo "PostgreSQL setup complete!"
 echo "Database: ${DB_NAME}"
 echo "User: ${DB_USER}"
